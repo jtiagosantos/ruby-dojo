@@ -11,21 +11,29 @@ function createPrismaClient(): PrismaClient {
 
   if (!tursoUrl) {
     throw new Error(
-      "TURSO_DATABASE_URL is not set. Set it in your .env file or environment variables."
+      "TURSO_DATABASE_URL is not set."
     );
   }
 
-  // Force HTTPS transport for Vercel/serverless environments.
-  // libsql:// uses WebSockets which may not be available; https:// uses HTTP fetch.
-  const httpUrl = tursoUrl.replace(/^libsql:\/\//, "https://");
+  // Force HTTPS transport — libsql:// uses WebSockets which are not available
+  // in Vercel serverless. https:// uses HTTP fetch which works everywhere.
+  const url = tursoUrl.replace(/^libsql:\/\//, "https://");
 
-  const adapter = new PrismaLibSql({ url: httpUrl, authToken: tursoToken });
+  const adapter = new PrismaLibSql({ url, authToken: tursoToken });
   return new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
 }
 
-export const prisma: PrismaClient =
-  globalForPrisma.prisma ?? createPrismaClient();
-
-if (process.env.NODE_ENV !== "production") {
-  (globalThis as unknown as { prisma: PrismaClient }).prisma = prisma;
+function getPrisma(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+  }
+  return globalForPrisma.prisma;
 }
+
+// Lazy proxy — defers PrismaClient instantiation until the first property access,
+// ensuring env vars are available at runtime rather than at module import time.
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    return getPrisma()[prop as keyof PrismaClient];
+  },
+});
