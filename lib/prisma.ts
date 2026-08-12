@@ -15,7 +15,11 @@ function createPrismaClient(): PrismaClient {
     );
   }
 
-  const adapter = new PrismaLibSql({ url: tursoUrl, authToken: tursoToken });
+  // Force HTTPS transport for Vercel/serverless environments.
+  // libsql:// uses WebSockets which may not be available; https:// uses HTTP fetch.
+  const httpUrl = tursoUrl.replace(/^libsql:\/\//, "https://");
+
+  const adapter = new PrismaLibSql({ url: httpUrl, authToken: tursoToken });
   return new PrismaClient({ adapter } as ConstructorParameters<typeof PrismaClient>[0]);
 }
 
