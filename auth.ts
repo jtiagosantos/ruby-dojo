@@ -4,8 +4,15 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "./auth.config";
 
+// In production on Vercel, AUTH_URL must be set to the deployment URL.
+// VERCEL_URL is automatically provided by Vercel but without protocol.
+const authUrl =
+  process.env.AUTH_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  ...(authUrl ? { basePath: "/api/auth", trustHost: true } : {}),
   providers: [
     GitHub({
       clientId: process.env.AUTH_GITHUB_ID,

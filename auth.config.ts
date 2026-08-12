@@ -1,6 +1,8 @@
 import type { NextAuthConfig } from "next-auth";
 import GitHub from "next-auth/providers/github";
 
+const isProd = process.env.NODE_ENV === "production";
+
 // This config is used in middleware (Edge Runtime) — NO Prisma, NO Node.js APIs
 export const authConfig: NextAuthConfig = {
   trustHost: true,
@@ -12,7 +14,7 @@ export const authConfig: NextAuthConfig = {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: false,
+        secure: isProd,
       },
     },
   },
