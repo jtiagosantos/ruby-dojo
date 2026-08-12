@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
-import { writeFile, unlink } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
-const execAsync = promisify(exec);
+// Judge0 Ruby language ID
+const RUBY_LANGUAGE_ID = 72;
+const JUDGE0_URL = process.env.JUDGE0_URL ?? "https://judge0-ce.p.rapidapi.com";
+const JUDGE0_API_KEY = process.env.JUDGE0_API_KEY ?? "";
 
 interface TestResult {
   name: string;
@@ -64,11 +62,84 @@ function extractFailureMessage(output: string, testName: string): string {
   return match ? match[1].trim() : "Falhou";
 }
 
-export async function POST(req: NextRequest) {
-  let tempFile: string | null = null;
+async function executeWithJudge0(sourceCode: string): Promise<{ output: string; error: string; timedOut: boolean }> {
+  const encoded = Buffer.from(sourceCode).toString("base64");
 
+  // Submit
+  const submitRes = await fetch(`${JUDGE0_URL}/submissions?base64_encoded=true&wait=false`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-RapidAPI-Key": JUDGE0_API_KEY,
+      "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
+    },
+    body: JSON.stringify({
+      language_id: RUBY_LANGUAGE_ID,
+      source_code: encoded,
+      cpu_time_limit: 10,
+      wall_time_limit: 15,
+    }),
+  });
+
+  if (!submitRes.ok) {
+    const text = await submitRes.text();
+    throw new Error(`Judge0 submit failed: ${submitRes.status} ${text}`);
+  }
+
+  const { token } = await submitRes.json() as { token: string };
+
+  // Poll until done (max ~15s)
+  const maxAttempts = 20;
+  const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  for (let i = 0; i < maxAttempts; i++) {
+    await delay(800);
+
+    const pollRes = await fetch(
+      `${JUDGE0_URL}/submissions/${token}?base64_encoded=true`,
+      {
+        headers: {
+          "X-RapidAPI-Key": JUDGE0_API_KEY,
+          "X-RapidAPI-Host": "judge0-ce.p.rapidapi.com",
+        },
+      }
+    );
+
+    if (!pollRes.ok) continue;
+
+    const data = await pollRes.json() as {
+      status: { id: number; description: string };
+      stdout: string | null;
+      stderr: string | null;
+      compile_output: string | null;
+      message: string | null;
+    };
+
+    // status.id: 1=In Queue, 2=Processing, 3=Accepted, 4=Wrong Answer,
+    //            5=Time Limit Exceeded, 6=Compilation Error, 7-12=Runtime Errors
+    if (data.status.id <= 2) continue; // still running
+
+    const decode = (s: string | null) =>
+      s ? Buffer.from(s, "base64").toString("utf-8") : "";
+
+    const stdout = decode(data.stdout);
+    const stderr = decode(data.stderr);
+    const compileOutput = decode(data.compile_output);
+    const output = stdout + stderr + compileOutput;
+
+    const timedOut = data.status.id === 5;
+    const execError = timedOut
+      ? "Tempo limite excedido (10 segundos). Verifique loops infinitos."
+      : "";
+
+    return { output, error: execError, timedOut };
+  }
+
+  return { output: "", error: "Timeout ao aguardar execução.", timedOut: true };
+}
+
+export async function POST(req: NextRequest) {
   try {
-    // Require authentication
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
@@ -85,7 +156,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Fetch challenge
     const challenge = await prisma.challenge.findUnique({
       where: { id: challengeId },
       select: { tests: true, points: true },
@@ -94,10 +164,6 @@ export async function POST(req: NextRequest) {
     if (!challenge) {
       return NextResponse.json({ error: "Desafio não encontrado" }, { status: 404 });
     }
-
-    // Create temp file
-    const fileName = `ruby_dojo_${Date.now()}_${Math.random().toString(36).slice(2)}.rb`;
-    tempFile = join(tmpdir(), fileName);
 
     const fullCode = `# frozen_string_literal: false
 ${code}
@@ -108,30 +174,7 @@ require 'minitest/autorun'
 ${challenge.tests}
 `;
 
-    await writeFile(tempFile, fullCode, "utf-8");
-
-    // Execute ruby
-    let output = "";
-    let execError = "";
-    let timedOut = false;
-
-    try {
-      const rubyPath = process.env.RUBY_PATH || "ruby";
-      const { stdout, stderr } = await execAsync(`${rubyPath} -W0 "${tempFile}"`, {
-        timeout: 10000,
-        maxBuffer: 1024 * 1024,
-      });
-      output = stdout + stderr;
-    } catch (err: unknown) {
-      const execErr = err as { stdout?: string; stderr?: string; killed?: boolean; message?: string };
-      output = (execErr.stdout || "") + (execErr.stderr || "");
-      if (execErr.killed) {
-        timedOut = true;
-        execError = "Tempo limite excedido (10 segundos). Verifique loops infinitos.";
-      } else if (!output) {
-        execError = execErr.message || "Erro desconhecido na execução";
-      }
-    }
+    const { output, error: execError, timedOut } = await executeWithJudge0(fullCode);
 
     // Parse results
     const testResults = parseMiniTestOutput(output);
@@ -159,10 +202,10 @@ ${challenge.tests}
       failedTests,
       testResults,
       output: output.slice(0, 5000),
-      error: timedOut ? execError : undefined,
+      error: (timedOut || execError) ? execError : undefined,
     };
 
-    // Save submission — always, regardless of pass/fail (for audit purposes)
+    // Save submission — always, regardless of pass/fail
     try {
       await prisma.submission.create({
         data: {
@@ -175,7 +218,6 @@ ${challenge.tests}
         },
       });
 
-      // Award points on first pass only
       if (passed) {
         const previousPass = await prisma.submission.findFirst({
           where: {
@@ -213,7 +255,5 @@ ${challenge.tests}
       },
       { status: 500 }
     );
-  } finally {
-    if (tempFile) unlink(tempFile).catch(() => {});
   }
 }
