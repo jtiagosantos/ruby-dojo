@@ -68,8 +68,8 @@ export default async function LearnPage() {
         </p>
       </div>
 
-      {/* User stats — big numbers */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      {/* User stats — big numbers (only when authenticated) */}
+      {userId && <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <div
           className="rounded-xl p-6 flex flex-col"
           style={{ background: "var(--bg-surface)", border: "1px solid var(--border-subtle)" }}
@@ -123,7 +123,7 @@ export default async function LearnPage() {
           </span>
           <span className="text-xs mt-3" style={{ color: "var(--text-muted)" }}>de {modules.length} módulos</span>
         </div>
-      </div>
+      </div>}
 
       {/* Trilha de aprendizado */}
       <div className="mb-12">
