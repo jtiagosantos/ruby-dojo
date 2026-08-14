@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { exec } from "child_process";
-import { promisify } from "util";
-import { writeFile, unlink } from "fs/promises";
-import { join } from "path";
-import { tmpdir } from "os";
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
-const execAsync = promisify(exec);
+const lambda = new LambdaClient({
+  region: process.env.AWS_REGION || "us-east-1",
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+  },
+});
 
-interface TestResult {
-  name: string;
+interface LambdaFailure {
+  index: number;
+  expected: string;
+  actual: string;
+}
+
+interface LambdaResult {
   passed: boolean;
-  message?: string;
+  total: number;
+  successful: number;
+  failed: number;
+  failures: LambdaFailure[];
 }
 
 interface RunResult {
@@ -20,53 +30,15 @@ interface RunResult {
   totalTests: number;
   passedTests: number;
   failedTests: number;
-  testResults: TestResult[];
-  output: string;
+  failures: LambdaFailure[];
   error?: string;
 }
 
-function parseMiniTestOutput(output: string): TestResult[] {
-  const results: TestResult[] = [];
-
-  const summaryMatch = output.match(/(\d+) runs, (\d+) assertions, (\d+) failures, (\d+) errors/);
-  if (!summaryMatch) return results;
-
-  const verboseRegex = /(\w+)\s*=\s*[\d.]+\s*s\s*=\s*([.FE])/g;
-  let match;
-  while ((match = verboseRegex.exec(output)) !== null) {
-    const [, name, status] = match;
-    results.push({
-      name: name.replace(/_/g, " "),
-      passed: status === ".",
-      message: status !== "." ? extractFailureMessage(output, name) : undefined,
-    });
-  }
-
-  if (results.length === 0) {
-    const runLine = output.match(/^[.FE]+/m);
-    if (runLine) {
-      [...runLine[0]].forEach((char, i) => {
-        results.push({
-          name: `Teste ${i + 1}`,
-          passed: char === ".",
-          message: char !== "." ? "Falhou" : undefined,
-        });
-      });
-    }
-  }
-
-  return results;
-}
-
-function extractFailureMessage(output: string, testName: string): string {
-  const regex = new RegExp(`${testName}[\\s\\S]*?\\n\\s+(.*?)\\n(?=\\n|[A-Z])`, "m");
-  const match = output.match(regex);
-  return match ? match[1].trim() : "Falhou";
+function formatRubyString(text: string): string {
+  return text.replace(/\r\n/g, "\n");
 }
 
 export async function POST(req: NextRequest) {
-  let tempFile: string | null = null;
-
   try {
     // Require authentication
     const session = await auth();
@@ -95,88 +67,82 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Desafio não encontrado" }, { status: 404 });
     }
 
-    // Create temp file
-    const fileName = `ruby_dojo_${Date.now()}_${Math.random().toString(36).slice(2)}.rb`;
-    tempFile = join(tmpdir(), fileName);
+    // Invoke Lambda
+    const payload = {
+      solution: formatRubyString(code),
+      tests: formatRubyString(challenge.tests),
+    };
 
-    const fullCode = `# frozen_string_literal: false
-${code}
+    const command = new InvokeCommand({
+      FunctionName: "ruby-dojo-solution-runner",
+      InvocationType: "RequestResponse",
+      Payload: JSON.stringify(payload),
+    });
 
-# --- TESTES ---
-require 'minitest/autorun'
+    const lambdaResponse = await lambda.send(command);
 
-${challenge.tests}
-`;
-
-    await writeFile(tempFile, fullCode, "utf-8");
-
-    // Execute ruby
-    let output = "";
-    let execError = "";
-    let timedOut = false;
-
-    try {
-      const rubyPath = process.env.RUBY_PATH || "ruby";
-      const { stdout, stderr } = await execAsync(`${rubyPath} -W0 "${tempFile}"`, {
-        timeout: 10000,
-        maxBuffer: 1024 * 1024,
-      });
-      output = stdout + stderr;
-    } catch (err: unknown) {
-      const execErr = err as { stdout?: string; stderr?: string; killed?: boolean; message?: string };
-      output = (execErr.stdout || "") + (execErr.stderr || "");
-      if (execErr.killed) {
-        timedOut = true;
-        execError = "Tempo limite excedido (10 segundos). Verifique loops infinitos.";
-      } else if (!output) {
-        execError = execErr.message || "Erro desconhecido na execução";
-      }
+    if (!lambdaResponse.Payload) {
+      return NextResponse.json(
+        {
+          passed: false,
+          totalTests: 0,
+          passedTests: 0,
+          failedTests: 0,
+          failures: [],
+          error: "Sem resposta da Lambda",
+        },
+        { status: 500 }
+      );
     }
 
-    // Parse results
-    const testResults = parseMiniTestOutput(output);
-    const summaryMatch = output.match(/(\d+) runs, (\d+) assertions, (\d+) failures, (\d+) errors/);
+    const rawPayload =
+      lambdaResponse.Payload instanceof Uint8Array
+        ? new TextDecoder().decode(lambdaResponse.Payload)
+        : String(lambdaResponse.Payload);
 
-    let passed = false;
-    let totalTests = testResults.length;
-    let passedTests = testResults.filter((t) => t.passed).length;
-    let failedTests = testResults.filter((t) => !t.passed).length;
+    console.log("[run-code] Lambda raw payload:", rawPayload);
 
-    if (summaryMatch) {
-      const runs = parseInt(summaryMatch[1]);
-      const failures = parseInt(summaryMatch[3]);
-      const errors = parseInt(summaryMatch[4]);
-      totalTests = runs;
-      failedTests = failures + errors;
-      passedTests = runs - failedTests;
-      passed = failedTests === 0 && !timedOut && !execError;
+    let parsed = JSON.parse(rawPayload);
+
+    // Handle double-encoded or wrapped responses
+    if (typeof parsed === "string") {
+      parsed = JSON.parse(parsed);
     }
+    if (parsed.body && typeof parsed.body === "string") {
+      parsed = JSON.parse(parsed.body);
+    }
+
+    const lambdaResult: LambdaResult = parsed;
+
+    // Use `failures.length` and `passed` as source of truth since
+    // the Lambda may return inconsistent successful/failed counts.
+    const failedTests = lambdaResult.failures.length;
+    const totalTests = lambdaResult.total;
+    const passedTests = totalTests - failedTests;
 
     const result: RunResult = {
-      passed,
+      passed: lambdaResult.passed,
       totalTests,
       passedTests,
       failedTests,
-      testResults,
-      output: output.slice(0, 5000),
-      error: timedOut ? execError : undefined,
+      failures: lambdaResult.failures,
     };
 
-    // Save submission — always, regardless of pass/fail (for audit purposes)
+    // Save submission
     try {
       await prisma.submission.create({
         data: {
           userId,
           challengeId,
           code,
-          passed,
-          score: passed ? challenge.points : 0,
-          output: output.slice(0, 2000),
+          passed: result.passed,
+          score: result.passed ? challenge.points : 0,
+          output: JSON.stringify(lambdaResult).slice(0, 2000),
         },
       });
 
       // Award points on first pass only
-      if (passed) {
+      if (result.passed) {
         const previousPass = await prisma.submission.findFirst({
           where: {
             userId,
@@ -207,13 +173,10 @@ ${challenge.tests}
         totalTests: 0,
         passedTests: 0,
         failedTests: 0,
-        testResults: [],
-        output: "",
+        failures: [],
         error: "Erro interno ao executar o código",
       },
       { status: 500 }
     );
-  } finally {
-    if (tempFile) unlink(tempFile).catch(() => {});
   }
 }

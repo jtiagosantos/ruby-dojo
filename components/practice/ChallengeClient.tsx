@@ -20,10 +20,10 @@ const CodeEditor = dynamic(() => import("@/components/practice/CodeEditor"), {
   ),
 });
 
-interface TestResult {
-  name: string;
-  passed: boolean;
-  message?: string;
+interface Failure {
+  index: number;
+  expected: string;
+  actual: string;
 }
 
 interface RunResult {
@@ -31,8 +31,7 @@ interface RunResult {
   totalTests: number;
   passedTests: number;
   failedTests: number;
-  testResults: TestResult[];
-  output: string;
+  failures: Failure[];
   error?: string;
 }
 
@@ -86,8 +85,7 @@ export default function ChallengeClient({
         totalTests: 0,
         passedTests: 0,
         failedTests: 0,
-        testResults: [],
-        output: "",
+        failures: [],
         error: "Erro de rede ao executar o código.",
       });
     } finally {
@@ -217,76 +215,75 @@ export default function ChallengeClient({
                   </div>
                 </div>
 
-                {/* Test results */}
-                {result.testResults.length > 0 && (
-                  <div>
-                    <h4
-                      className="text-sm font-semibold mb-3 uppercase tracking-wide"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Detalhes dos testes
-                    </h4>
-                    <div className="space-y-2">
-                      {result.testResults.map((test, i) => (
+                {/* Test breakdown */}
+                <div>
+                  <h4
+                    className="text-sm font-semibold mb-3 uppercase tracking-wide"
+                    style={{ color: "var(--text-muted)" }}
+                  >
+                    Detalhes dos testes
+                  </h4>
+                  <div className="space-y-2">
+                    {Array.from({ length: result.totalTests }).map((_, i) => {
+                      const testNumber = i + 1;
+                      const failure = result.failures.find((f) => f.index === testNumber);
+                      // If failures array is empty but overall result failed, mark all as failed
+                      const hasDetailedFailures = result.failures.length > 0;
+                      const passed = hasDetailedFailures ? !failure : result.passed;
+                      return (
                         <div
                           key={i}
                           className="flex items-start gap-3 p-3 rounded-lg"
                           style={{
-                            background: test.passed
+                            background: passed
                               ? "rgba(34,197,94,0.05)"
                               : "rgba(239,68,68,0.05)",
-                            border: `1px solid ${test.passed ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
+                            border: `1px solid ${passed ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
                           }}
                         >
-                          <span className="shrink-0 mt-0.5">
-                            {test.passed ? "✓" : "✗"}
+                          <span
+                            className="shrink-0 mt-0.5 text-sm font-bold"
+                            style={{ color: passed ? "var(--success)" : "var(--error)" }}
+                          >
+                            {passed ? "✓" : "✗"}
                           </span>
-                          <div>
+                          <div className="flex-1">
                             <div
                               className="text-sm font-medium"
-                              style={{
-                                color: test.passed ? "var(--success)" : "var(--error)",
-                              }}
+                              style={{ color: passed ? "var(--success)" : "var(--error)" }}
                             >
-                              {test.name}
+                              Teste {testNumber}
                             </div>
-                            {test.message && (
-                              <div
-                                className="text-xs mt-1 font-mono"
-                                style={{ color: "var(--text-muted)" }}
-                              >
-                                {test.message}
+                            {failure && (
+                              <div className="mt-2 flex gap-4">
+                                <div
+                                  className="flex-1 px-3 py-2 rounded-md text-xs font-mono"
+                                  style={{
+                                    background: "rgba(34,197,94,0.08)",
+                                    border: "1px solid rgba(34,197,94,0.2)",
+                                  }}
+                                >
+                                  <span style={{ color: "var(--text-muted)" }}>esperado: </span>
+                                  <span style={{ color: "var(--success)" }}>{failure.expected}</span>
+                                </div>
+                                <div
+                                  className="flex-1 px-3 py-2 rounded-md text-xs font-mono"
+                                  style={{
+                                    background: "rgba(239,68,68,0.08)",
+                                    border: "1px solid rgba(239,68,68,0.2)",
+                                  }}
+                                >
+                                  <span style={{ color: "var(--text-muted)" }}>recebido: </span>
+                                  <span style={{ color: "var(--error)" }}>{failure.actual}</span>
+                                </div>
                               </div>
                             )}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                )}
-
-                {/* Raw output */}
-                {result.output && (
-                  <div>
-                    <h4
-                      className="text-sm font-semibold mb-2 uppercase tracking-wide"
-                      style={{ color: "var(--text-muted)" }}
-                    >
-                      Saída completa
-                    </h4>
-                    <pre
-                      className="p-4 rounded-lg text-xs leading-relaxed overflow-x-auto"
-                      style={{
-                        background: "var(--bg-code)",
-                        border: "1px solid var(--border-subtle)",
-                        color: "#e6edf3",
-                        fontFamily: "var(--font-geist-mono)",
-                      }}
-                    >
-                      {result.output}
-                    </pre>
-                  </div>
-                )}
+                </div>
 
                 {result.error && (
                   <div
