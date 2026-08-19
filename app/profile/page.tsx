@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { DifficultyBadge } from "@/components/ui/Badge";
 import ProgressBar from "@/components/ui/ProgressBar";
+import LogoutButton from "@/components/profile/LogoutButton";
 
 export const metadata = {
   title: "Perfil — Ruby Dojo",
@@ -89,7 +90,7 @@ export default async function ProfilePage() {
             style={{ border: "2px solid var(--border-default)" }}
           />
         )}
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>
             {user.name ?? "Usuário"}
           </h1>
@@ -97,6 +98,7 @@ export default async function ProfilePage() {
             {user.email}
           </p>
         </div>
+        <LogoutButton />
       </div>
 
       <div className="space-y-6">
@@ -193,7 +195,7 @@ export default async function ProfilePage() {
                 <div key={module.id} className="flex items-center gap-4">
                   <Link
                     href={`/learn/${module.slug}`}
-                    className="flex items-center gap-2 w-48 shrink-0"
+                    className="flex items-center gap-2 w-32 sm:w-48 shrink-0 truncate"
                   >
                     <span className="text-lg">{module.icon}</span>
                     <span

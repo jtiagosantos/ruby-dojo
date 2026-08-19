@@ -62,10 +62,10 @@ export default async function ModulePage({ params }: PageProps) {
 
       <div className="grid lg:grid-cols-[1fr_300px] gap-8">
         {/* Main content */}
-        <div>
+        <div className="min-w-0">
           {/* Module header */}
           <div
-            className="rounded-xl p-8 mb-8"
+            className="rounded-xl p-4 sm:p-8 mb-8"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border-subtle)",
@@ -98,7 +98,7 @@ export default async function ModulePage({ params }: PageProps) {
 
           {/* Content */}
           <div
-            className="rounded-xl p-8"
+            className="rounded-xl p-4 sm:p-8"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border-subtle)",
@@ -236,7 +236,7 @@ export default async function ModulePage({ params }: PageProps) {
             >
               Todos os Módulos
             </h3>
-            <div className="space-y-1">
+            <div className="space-y-1 max-h-64 lg:max-h-none overflow-y-auto">
               {allModules.map((m) => (
                 <Link
                   key={m.slug}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
+import BottomNav from "@/components/layout/BottomNav";
 import SessionProvider from "@/components/layout/SessionProvider";
 
 const geistMono = Geist_Mono({
@@ -28,11 +29,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SessionProvider>
           <Sidebar />
           <main
-            className="flex-1 overflow-y-auto"
+            className="flex-1 min-w-0 overflow-x-hidden overflow-y-auto pb-16 lg:pb-0"
             style={{ minHeight: "100vh" }}
           >
             {children}
           </main>
+          <BottomNav />
         </SessionProvider>
       </body>
     </html>
