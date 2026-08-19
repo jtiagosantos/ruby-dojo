@@ -107,7 +107,7 @@ export default async function ChallengePage({ params, searchParams }: PageProps)
         <span style={{ color: "var(--text-secondary)" }}>{challenge.title}</span>
       </nav>
 
-      <div className="grid lg:grid-cols-[1fr_560px] gap-6 min-h-[600px]">
+      <div className="grid lg:grid-cols-[1fr_560px] gap-6 lg:min-h-[600px]">
         {/* Left: Description */}
         <div className="flex flex-col">
           {/* Challenge header */}
@@ -167,7 +167,7 @@ export default async function ChallengePage({ params, searchParams }: PageProps)
 
           {/* Description */}
           <div
-            className="rounded-xl p-6 flex-1 overflow-y-auto"
+            className="rounded-xl p-6 lg:flex-1 lg:overflow-y-auto"
             style={{
               background: "var(--bg-surface)",
               border: "1px solid var(--border-subtle)",
@@ -188,7 +188,7 @@ export default async function ChallengePage({ params, searchParams }: PageProps)
 
           {/* Navigation */}
           {(prevChallenge || nextChallenge) && (
-            <div className="flex items-center gap-3 mt-4">
+            <div className="flex flex-col sm:flex-row items-stretch gap-3 mt-4">
               {prevChallenge && (
                 <Link
                   href={`/practice/${prevChallenge.id}`}
@@ -209,7 +209,7 @@ export default async function ChallengePage({ params, searchParams }: PageProps)
               {nextChallenge && (
                 <Link
                   href={`/practice/${nextChallenge.id}`}
-                  className="flex-1 rounded-xl p-4 text-right"
+                   className="flex-1 rounded-xl p-4 sm:text-right"
                   style={{
                     background: "var(--bg-surface)",
                     border: "1px solid var(--border-subtle)",
