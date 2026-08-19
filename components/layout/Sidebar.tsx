@@ -23,13 +23,12 @@ export default function Sidebar() {
 
   return (
     <aside
+      className="hidden lg:flex flex-col"
       style={{
         background: "var(--bg-sidebar)",
         borderRight: "1px solid var(--border-subtle)",
         width: "220px",
         minWidth: "220px",
-        display: "flex",
-        flexDirection: "column",
         position: "sticky",
         top: 0,
         height: "100vh",
