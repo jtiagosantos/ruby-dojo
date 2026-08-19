@@ -8,10 +8,10 @@ const notion = new Client({ auth: process.env.NOTION_TOKEN });
 const CHALLENGES_DB_ID = "3b95261347dc80718d5cd877c15ea6cf";
 const CHALLENGES_DATA_SOURCE_ID = "4d552613-47dc-8323-aa95-07fdccc35bee";
 const SOURCE_PAGE_ID = "3b95261347dc8099accac03f3ec714bd"; // página com os desafios a importar
-const MODULE_NOTION_PAGE_ID = "3ba52613-47dc-8093-ba7e-cd6d4a1a7787";
-const MODULE_NAME = "Collections + Enumerable";
-const DEFAULT_DIFFICULTY = "beginner";
-const DEFAULT_POINTS = 10;
+const MODULE_NOTION_PAGE_ID = "3bf52613-47dc-80b0-9d58-c3a8b0daf5af";
+const MODULE_NAME = "Blocos, Proc e Lambda";
+const DEFAULT_DIFFICULTY = "intermediate";
+const DEFAULT_POINTS = 25;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
