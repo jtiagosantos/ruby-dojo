@@ -17,6 +17,10 @@ const customTheme = EditorView.theme({
   "&": {
     fontSize: "14px",
     fontFamily: "var(--font-geist-mono), 'Fira Code', monospace",
+    maxWidth: "100%",
+  },
+  ".cm-scroller": {
+    overflowX: "auto",
   },
   ".cm-content": {
     padding: "12px 0",
@@ -44,11 +48,11 @@ const customTheme = EditorView.theme({
   },
 });
 
-export default function CodeEditor({ value, onChange, height = "400px", readOnly = false }: CodeEditorProps) {
+export default function CodeEditor({ value, onChange, height = "45vh", readOnly = false }: CodeEditorProps) {
   return (
     <div
       className="rounded-lg overflow-hidden"
-      style={{ border: "1px solid var(--border-default)" }}
+      style={{ border: "1px solid var(--border-default)", minHeight: "300px", maxWidth: "100%" }}
     >
       <CodeMirror
         value={value}

@@ -109,7 +109,7 @@ export default async function ChallengePage({ params, searchParams }: PageProps)
 
       <div className="grid lg:grid-cols-[1fr_560px] gap-6 lg:min-h-[600px]">
         {/* Left: Description */}
-        <div className="flex flex-col">
+        <div className="flex flex-col min-w-0">
           {/* Challenge header */}
           <div
             className="rounded-xl p-6 mb-4"

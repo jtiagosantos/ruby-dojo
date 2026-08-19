@@ -103,25 +103,25 @@ export default function ChallengeClient({
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div
-        className="flex items-center justify-between px-4 py-3 rounded-t-xl"
+        className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-t-xl"
         style={{
           background: "var(--bg-elevated)",
           borderBottom: "1px solid var(--border-subtle)",
         }}
       >
         {/* Tabs */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-1 min-w-0">
           {([
-            { id: "editor", label: "✏️ Editor" },
-            { id: "output", label: "📋 Resultado" },
+            { id: "editor", label: "✏️ Editor", labelShort: "Editor" },
+            { id: "output", label: "📋 Resultado", labelShort: "Output" },
             ...(communitySolutions.length > 0
-              ? [{ id: "solutions", label: `👥 Soluções (${communitySolutions.length})` }]
+              ? [{ id: "solutions", label: `👥 Soluções (${communitySolutions.length})`, labelShort: `Soluções (${communitySolutions.length})` }]
               : []),
           ] as const).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className="px-4 py-1.5 rounded-md text-sm font-medium transition-all cursor-pointer"
+              className="px-2 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all cursor-pointer shrink-0"
               style={{
                 background: activeTab === tab.id ? "var(--bg-surface)" : "transparent",
                 color: activeTab === tab.id ? "var(--text-primary)" : "var(--text-muted)",
@@ -131,10 +131,11 @@ export default function ChallengeClient({
                     : "1px solid transparent",
               }}
             >
-              {tab.label}
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.labelShort}</span>
               {tab.id === "output" && result && (
                 <span
-                  className="ml-2 w-2 h-2 rounded-full inline-block"
+                  className="ml-1.5 w-2 h-2 rounded-full inline-block"
                   style={{
                     background: result.passed ? "var(--success)" : "var(--error)",
                   }}
@@ -145,7 +146,7 @@ export default function ChallengeClient({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Button variant="ghost" size="sm" onClick={handleReset}>
             Reset
           </Button>
@@ -155,7 +156,7 @@ export default function ChallengeClient({
             loading={loading}
             onClick={handleRun}
           >
-            {loading ? "Executando..." : "▶ Executar Testes"}
+            {loading ? "..." : <><span className="hidden sm:inline">▶ Executar Testes</span><span className="sm:hidden">▶ Executar</span></>}
           </Button>
         </div>
       </div>
@@ -167,19 +168,19 @@ export default function ChallengeClient({
           background: "var(--bg-surface)",
           border: "1px solid var(--border-subtle)",
           borderTop: "none",
-          minHeight: "500px",
+          minHeight: "300px",
         }}
       >
         {activeTab === "editor" ? (
           <div className="p-4">
-            <CodeEditor value={code} onChange={setCode} height="450px" />
+            <CodeEditor value={code} onChange={setCode} height="min(45vh, 480px)" />
           </div>
         ) : activeTab === "solutions" ? (
-          <div className="p-5 overflow-y-auto" style={{ height: "500px" }}>
+          <div className="p-5 overflow-y-auto" style={{ height: "min(45vh, 480px)", minHeight: "300px" }}>
             <CommunitySolutions solutions={communitySolutions} />
           </div>
         ) : (
-          <div className="p-6 overflow-y-auto" style={{ height: "500px" }}>
+          <div className="p-6 overflow-y-auto" style={{ height: "min(45vh, 480px)", minHeight: "300px" }}>
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 gap-4">
                 <div
