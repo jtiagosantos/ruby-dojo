@@ -1,36 +1,145 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ruby Dojo
 
-## Getting Started
+Plataforma interativa de aprendizado de Ruby, com teoria estruturada e desafios
+de código com feedback em tempo real.
 
-First, run the development server:
+## Sobre o projeto
+
+O Ruby Dojo é uma aplicação full-stack que permite aprender Ruby do zero por
+meio de módulos teóricos e desafios práticos. O usuário escreve código Ruby
+diretamente no browser e recebe o resultado da execução dos testes.
+
+## Funcionalidades
+
+- **Aprender** — trilha de módulos com conteúdo em Markdown, navegação
+  sequencial e desafios relacionados
+- **Praticar** — lista de desafios filtrados por dificuldade (Iniciante,
+  Intermediário, Avançado)
+- **Editor de código** — CodeMirror 6 com syntax highlighting para Ruby e tema
+  One Dark
+- **Execução real de código** — submissões invocam uma AWS Lambda que roda
+  Minitest e retorna resultados por teste
+- **Soluções da comunidade** — visíveis após resolver o desafio
+- **Ranking** — placar global com top 50, pódio para os 3 primeiros e destaque
+  do usuário logado
+- **Perfil** — estatísticas, progresso por módulo e histórico de submissões
+- **Autenticação** — login com GitHub via NextAuth.js v5
+
+## Stack
+
+| Camada            | Tecnologia                           |
+| ----------------- | ------------------------------------ |
+| Framework         | Next.js 15 (App Router)              |
+| Linguagem         | TypeScript                           |
+| UI                | React 19 + Tailwind CSS v4           |
+| Autenticação      | NextAuth.js v5 + GitHub OAuth        |
+| ORM               | Prisma v7                            |
+| Banco local       | SQLite (better-sqlite3)              |
+| Banco em produção | Turso (libSQL)                       |
+| Editor de código  | CodeMirror 6 (@uiw/react-codemirror) |
+| Execução Ruby     | AWS Lambda (Minitest)                |
+| CMS               | Notion API                           |
+
+## Pré-requisitos
+
+- Node.js 20+
+- Uma OAuth App do GitHub
+- Credenciais AWS com acesso à Lambda `ruby-dojo-solution-runner`
+- Banco Turso (produção) ou SQLite local (desenvolvimento)
+
+## Instalação
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Instalar dependências
+npm install
+
+# Gerar o client do Prisma
+npx prisma generate
+
+# Criar e migrar o banco local
+npx prisma migrate dev
+
+# Popular com dados iniciais
+npm run db:seed
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variáveis de ambiente
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Crie um arquivo `.env` na raiz com:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```env
+# Banco local (SQLite)
+DATABASE_URL="file:./dev.db"
 
-## Learn More
+# NextAuth
+AUTH_SECRET="<segredo-aleatorio>"
+AUTH_GITHUB_ID="<github-client-id>"
+AUTH_GITHUB_SECRET="<github-client-secret>"
+AUTH_TRUST_HOST="true"
+NEXTAUTH_URL="http://localhost:3000"
 
-To learn more about Next.js, take a look at the following resources:
+# Turso (produção)
+TURSO_DATABASE_URL="libsql://<db>.<org>.turso.io"
+TURSO_AUTH_TOKEN="<token>"
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Notion CMS
+NOTION_TOKEN="<integration-token>"
+NOTION_MODULES_DB_ID="<database-id>"
+NOTION_CHALLENGES_DB_ID="<database-id>"
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# AWS Lambda
+AWS_ACCESS_KEY_ID="<access-key>"
+AWS_SECRET_ACCESS_KEY="<secret>"
+AWS_REGION="us-east-1"
+```
 
-## Deploy on Vercel
+## Scripts disponíveis
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+# Desenvolvimento
+npm run dev          # servidor local em http://localhost:3000
+npm run build        # build de produção
+npm start            # inicia o servidor de produção
+npm run lint         # lint
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Banco de dados
+npm run db:reset     # reset + seed completo
+npm run db:seed      # apenas seed (módulos e desafios)
+npm run db:seed-users  # seed de usuários de teste
+
+# Pipeline de conteúdo (Notion)
+npm run notion:sync      # sincroniza módulos e desafios do Notion → banco
+npm run notion:populate  # importa desafios em massa de uma página Notion
+```
+
+## Estrutura do projeto
+
+```
+app/           # Rotas e páginas (Next.js App Router)
+  api/         # API routes (run-code, auth)
+  learn/       # Módulos de aprendizado
+  practice/    # Desafios de código
+  profile/     # Perfil do usuário
+  ranking/     # Placar global
+components/    # Componentes React reutilizáveis
+lib/           # Singleton do Prisma
+prisma/        # Schema, migrações e seeds
+scripts/       # Scripts de manutenção e sync com Notion
+```
+
+## Banco de dados
+
+O projeto usa **SQLite** em desenvolvimento e **Turso** (libSQL) em produção. As
+migrações ficam em `prisma/migrations/` e são gerenciadas pelo Prisma CLI.
+
+Para migrar dados do banco local para o Turso em produção:
+
+```bash
+npx tsx scripts/migrate-to-prod.ts
+```
+
+## Deploy
+
+A aplicação está preparada para deploy na **Vercel**. Certifique-se de
+configurar todas as variáveis de ambiente no painel da Vercel antes de fazer o
+deploy.
